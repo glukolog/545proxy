@@ -26,7 +26,7 @@
 #include "defs.h"
 
 #define DEFAULT_PROXY_HOST		"0.0.0.0"
-#define DEFAULT_PROXY_PORT		3737
+#define DEFAULT_PROXY_PORT		5450
 
 #define DEFAULT_POOL_PORT		3333
 #define DEFAULT_POOL_PRIORITY	1

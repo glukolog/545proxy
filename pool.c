@@ -23,6 +23,11 @@
 #include "defs.h"
 #include <stdlib.h>
 #include <string.h>
+#include <jansson.h>
+
+#ifdef _MSC_VER
+#define strcasecmp(x,y) _stricmp(x,y)
+#endif
 
 static void pool_timeout( uv_timer_t *timer );
 
@@ -31,6 +36,8 @@ extern void miner_write_done( uv_write_t *req, int status );
 static void pool_broadcast( pool_ctx *px, uv_buf_t buf[], unsigned int count )
 {
 	unsigned int i, j;
+	int index = 0;
+	int lplus = 0;
 
 	if (!px->count)
 		return;
@@ -60,11 +67,46 @@ static void pool_broadcast( pool_ctx *px, uv_buf_t buf[], unsigned int count )
 			continue;
 		}
 
+		for (uint32_t jb = 0; jb < count;jb++)
+		{
+			json_error_t err;
+			json_t *root = json_loads(buf[jb].base, 0, &err);
+			json_t *method_val = json_object_get(root, "method");
+			if (method_val) {
+				const char *method = json_string_value(method_val);
+				if (!unlikely(!method)) {
+					if (strcasecmp(method, "mining.notify") == 0) {
+						json_object_set_new(root, "total_num", json_integer(px->count));
+						json_object_set_new(root, "index_num", json_integer(index + 1));
+						json_object_set_new(root, "groug_of_members", json_integer(1));
+
+						mx->attachInfo[0] = '\0';
+						size_t ret = json_dumpb(root, mx->attachInfo, sizeof(mx->attachInfo) - 1, JSON_COMPACT);
+						mx->attachInfo[ret] = '\0';
+
+						int len = (int)strlen(mx->attachInfo);
+						mx->attachInfo[len] = '\n';
+						mx->attachInfo[len + 1] = '\0';
+
+						buf[jb].base = mx->attachInfo;
+						buf[jb].len = len + 1;
+
+						lplus = 1;
+					}
+				}
+			}
+			json_decref(root);
+		}
+		if (lplus) {
+			lplus = 0;
+			++index;
+		}
+
 		mx->sctx.jobLen = count;
-		uv_write(&mx->m_req, &mx->handle.stream, buf, count, miner_write_done);
 		mx->sctx.diff = px->sctx.diff;
 		strcpy(mx->sctx.jobid, px->sctx.jobid);
 		mx->sctx.ntime = px->sctx.ntime;
+		uv_write(&mx->m_req, &mx->handle.stream, buf, count, miner_write_done);
 	}
 	ASSERT(j == px->count);
 }
@@ -142,7 +184,7 @@ static void pool_read_done( uv_stream_t *stream, ssize_t nread,
 	len = px->pos + (unsigned int)nread;
 	px->buf[len] = '\0';
 
-	left_bytes = stratum_parse(&px->sctx, px->buf, len);
+	left_bytes = stratum_parse_server(&px->sctx, px->buf, len);
 	if (left_bytes < 0 || left_bytes >= sizeof(px->buf)) {
 		pr_err("Disconnect pool %s/%s:%hu", px->conf->host, px->addr,
 			px->conf->port);
@@ -266,6 +308,8 @@ static void share_submitted( uv_write_t *req, int status )
 	buf.len = mx->shareLen - mx->lastShareLen;
 	mx->writeShareLen = mx->lastShareLen;
 	mx->lastShareLen = mx->shareLen;
+	pr_info("##107 %s_%s_%d: mx->writeShareLen:%u, mx->lastShareLen:%u, mx->shareLen:%u, mx->share:%s",
+		__FILE__, __FUNCTION__, __LINE__, mx->writeShareLen, mx->lastShareLen, mx->shareLen, mx->share);
 	uv_write(&mx->p_req, &px->handle.stream, &buf, 1, share_submitted);
 }
 
@@ -308,12 +352,17 @@ void pool_submit_share( miner_ctx *mx, const char *miner, const char* jobid,
 
 	mx->shareLen += stratum_create_share(&px->sctx, mx->share + mx->shareLen,
 		px->conf->miner, jobid, &xn[px->sctx.xn1size * 2], ntime, nonce);
-	if (mx->writeShareLen != mx->lastShareLen);
-	else if (px->status != p_working) mx->pxreconn = 1;
+	if (mx->writeShareLen != mx->lastShareLen) {
+	}
+	else if (px->status != p_working) {
+		mx->pxreconn = 1;
+	}
 	else {
 		buf.base = mx->share + mx->lastShareLen;
 		buf.len = mx->shareLen - mx->lastShareLen;
 		mx->lastShareLen = mx->shareLen;
+		pr_info("##007 %s_%s_%d: mx:%X, mx->m_req:%X, mx->handle.stream:%X, buf.len:%u, buf.base:%s", 
+			__FILE__, __FUNCTION__, __LINE__, mx, mx->m_req, mx->handle.stream, buf.len, buf.base);
 		uv_write(&mx->p_req, &px->handle.stream, &buf, 1,
 			share_submitted);
 	}

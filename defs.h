@@ -28,7 +28,7 @@
 #include <uv.h>
 #include "stratum.h"
 
-#define PROXY_VER		2
+#define PROXY_VER		1.3
 
 struct miner_ctx;
 
@@ -45,7 +45,7 @@ typedef struct pool_config {
 	int priority:3;
 	unsigned int weight:20;
 	unsigned int timeout:25;
-	char miner[32];
+	char miner[64];
 	char passwd[32];
 	char cbaddr[36];
 	uint64_t cbtotal;
@@ -105,8 +105,8 @@ typedef struct miner_ctx {
 	/*    0h */ char bind[INET6_ADDRSTRLEN];
 	/*   2eh */ char addr[INET6_ADDRSTRLEN];
 	/*   5ch */ unsigned short port;
-	/*   5eh */ char miner[32];
-	/*   7eh */ char agent[16];
+	/*   5eh */ char miner[64];
+	/*   7eh */ char agent[64];
 	/*   90h */ proxy_config *pxx;
 	/*   98h */ pool_ctx *px;
 	/*   a0h */ union {
@@ -119,9 +119,10 @@ typedef struct miner_ctx {
 	/*  3d8h */ stratum_ctx sctx;
 	/*  478h */ char outbuf[2048];
 	/*  c78h */ char share[2048];
-	/* 1478h */ char buf[256];
+	/* 1478h */ char buf[2048];
+	/* */  char attachInfo[2304];
 
-	unsigned int dummy:8, pos:8, wpos:8;
+	unsigned int dummy:12, pos:12, wpos:12;
 	unsigned int closing:2, pxreconn:1;
 	unsigned int shareLen:12, lastShareLen:12, writeShareLen:12;
 } miner_ctx;

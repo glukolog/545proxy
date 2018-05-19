@@ -33,6 +33,10 @@
 #include "stratum.h"
 
 extern const char *app_name;
+extern unsigned int pool_connecte_complete;
+
+// https://www.nicehash.com/help/patches-for-extranoncesubscription
+char set_extranonce[256];
 
 /* caller ensures the buf has enough room for subscribe & authorize requests */
 int stratum_init( stratum_ctx *sctx, char *buf, const char* user,
@@ -42,6 +46,8 @@ int stratum_init( stratum_ctx *sctx, char *buf, const char* user,
 		memset(sctx, 0, sizeof(*sctx));
 
 	ASSERT(buf && user && passwd);
+	memset(set_extranonce, 0, sizeof(set_extranonce));
+	sprintf(set_extranonce, "{\"id\":3,\"result\":false,\"error\":[20,\"Not supported.\",null]}\n");
 
 	sctx->isServer = 1;
 	sctx->msgid = 3;
@@ -52,6 +58,8 @@ int stratum_init( stratum_ctx *sctx, char *buf, const char* user,
 		"\n"
 		"{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"%s\"]}"
 		"\n"
+        "{\"id\":3,\"method\":\"mining.extranonce.subscribe\",\"params\":[]}"
+        "\n"
 		,
 		app_name, (double)PROXY_VER, user, passwd);
 }
@@ -192,6 +200,8 @@ int parse_authorize_result( stratum_ctx *sctx, json_t *val )
 
 	sctx->authorized = 1;
 
+	pool_connecte_complete = 1;
+
 	return 0;
 }
 
@@ -207,6 +217,9 @@ static int parse_submit_response( stratum_ctx *sctx, json_t *val,
 			sctx->sdiff -= sctx->diff;
 			++sctx->denyCount;
 		}
+	}
+	else {
+		pr_info("*** parse_submit_response: success! ");
 	}
 
 	return 0;
@@ -335,7 +348,6 @@ incomplete_cb:
 int parse_job( stratum_ctx *sctx, json_t *val )
 {
 	const char *s;
-	unsigned char cb[256], *p;
 	unsigned int len;
 
 	if (!val || !json_is_array(val) || json_array_size(val) != 9 ||
@@ -365,26 +377,27 @@ int parse_job( stratum_ctx *sctx, json_t *val )
 		pr_err("Parse job error: invalid ntime");
 		return -4;
 	}
-	hex2bin(cb, s, 8);
-	sctx->ntime = be32toh(*(uint32_t *)cb);
+	// zhangfj del
+	//hex2bin(cb, s, 8);
+	//sctx->ntime = be32toh(*(uint32_t *)cb);
 
-	s = json_string_value(json_array_get(val, 2));
-	if (!s || !(len = (unsigned int)strlen(s)) || len % 2) {
-		pr_err("Parse job error: invalid coinbase first half");
-		return -5;
-	}
-	hex2bin(cb, s, len);
-	p = cb + len / 2 + sctx->xn1size + sctx->xn2size;
+	//s = json_string_value(json_array_get(val, 2));
+	//if (!s || !(len = (unsigned int)strlen(s)) || len % 2) {
+	//	pr_err("Parse job error: invalid coinbase first half");
+	//	return -5;
+	//}
+	//hex2bin(cb, s, len);
+	//p = cb + len / 2 + sctx->xn1size + sctx->xn2size;
 
-	s = json_string_value(json_array_get(val, 3));
-	if (!s || !(len = (unsigned int)strlen(s)) || len % 2) {
-		pr_err("Parse job error: invalid coinbase second half");
-		return -6;
-	}
-	hex2bin(p, s, len);
+	//s = json_string_value(json_array_get(val, 3));
+	//if (!s || !(len = (unsigned int)strlen(s)) || len % 2) {
+	//	pr_err("Parse job error: invalid coinbase second half");
+	//	return -6;
+	//}
+	//hex2bin(p, s, len);
 
-	if (check_coinbase(sctx, cb, (unsigned int)(p - cb) + len / 2))
-		return -7;
+	//if (check_coinbase(sctx, cb, (unsigned int)(p - cb) + len / 2))
+	//	return -7;
 
 	return 0;
 }
@@ -509,9 +522,17 @@ static int parse_share( stratum_ctx *sctx, json_t *val )
 
 	sctx->sdiff += sctx->diff;
 	++sctx->shareCount;
+	pr_info("##008 %s_%s_%d: sctx->shareCount:%u, sctx->sdiff:%f, sctx->diff:%f", 
+		__FILE__, __FUNCTION__, __LINE__, sctx->shareCount, sctx->sdiff, sctx->diff);
 
 	if ((mx = sctx->cx))
 		mx->px->ss(mx, miner, jobid, xn, ntime, nonce);
+
+	if (mx) {
+		pr_info("##009 %s_%s_%d: sctx->shareCount:%u, sctx->sdiff:%f, sctx->diff:%f, mx->m_req:%X, mx->handle.stream:%X",
+			__FILE__, __FUNCTION__, __LINE__, sctx->shareCount, sctx->sdiff, sctx->diff, mx->m_req, mx->handle.stream);
+		pr_info("##010 %s_%s_%d: mx->bind:%s, mx->addr:%s, mx->port:%u", __FILE__, __FUNCTION__, __LINE__, mx->bind, mx->addr, mx->port);
+	}
 
 	sctx->jobLen += sprintf(mx->outbuf + sctx->jobLen,
 		"{\"id\":%u,\"result\":true,\"error\":null}\n",
@@ -588,6 +609,21 @@ static int parse_authorize( stratum_ctx *sctx, json_t *val )
 	return 0;
 }
 
+static int parse_extranonce(stratum_ctx *sctx, json_t *val)
+{
+	miner_ctx *mx = (miner_ctx *)sctx->cx;
+	size_t len = strlen(set_extranonce);
+
+	if (len > 0) {
+		sctx->jobLen += sprintf(mx->outbuf + sctx->jobLen, set_extranonce);
+	}
+	else {
+		pr_err("set_extranonce no data!");
+		return -1;
+	}
+
+	return 0;
+}
 
 #define copy_message(str, len, buf, size) { \
 	memcpy(str, buf, size - 1);	len = size; \
@@ -649,7 +685,13 @@ int stratum_parse( stratum_ctx *sctx, char *buf, unsigned int len )
 					do_reconnect(sctx, json_object_get(val, "params"));
 					r = -5;
 				} else if (!strcmp(method, "mining.set_extranonce")) {
-					/* no set_extranonce support in this edition. */
+					size_t len = sizeof(set_extranonce);
+					if (size >= len) {
+						r = -6;
+					} else {
+						set_extranonce[0] = '\0';
+						copy_message(set_extranonce, sctx->diffLen, buf, size);
+					}
 				} else if (!strcmp(method, "client.show_message")) {
 					if (show_message(sctx, json_object_get(val, "params")))
 						r = -7;
@@ -668,6 +710,7 @@ int stratum_parse( stratum_ctx *sctx, char *buf, unsigned int len )
 					pr_err("JSON-RPC miner error: null id");
 					r = -10;
 				} else if (!strcmp(method, "mining.submit")) {
+					miner_ctx *mx = sctx->cx;
 					if (parse_share(sctx, json_object_get(val, "params")))
 						r = -11;
 				} else if (!strcmp(method, "mining.get_transactions")) {
@@ -679,33 +722,36 @@ int stratum_parse( stratum_ctx *sctx, char *buf, unsigned int len )
 				} else if (!strcmp(method, "mining.authorize")) {
 					if (parse_authorize(sctx, json_object_get(val, "params")))
 						r = -14;
+				} else if (!strcmp(method, "mining.extranonce.subscribe")) {
+					if (parse_extranonce(sctx, json_object_get(val, "params")))
+						r = -15;
 				} else {
 					pr_err("JSON-RPC miner error: unknown method '%s'", method);
-					r = -15;
+					r = -16;
 				}
 			}
 		} else if (sctx->isServer) {
 			id_val = json_object_get(val, "id");
 			if (!id_val || json_is_null(id_val)) {
 				pr_err("JSON-RPC response error: null id");
-				r = -16;
+				r = -17;
 			} else if ((id = json_integer_value(id_val)) >= sctx->msgid) {
 				pr_err("JSON-RPC response error: wrong id");
-				r = -17;
+				r = -18;
 			} else if (id > 2) {
 				if (parse_submit_response(sctx, val, id))
-					r = -18;
+					r = -19;
 			} else if (id == 1) {
 				if (setup_context(sctx, val))
-					r = -19;
+					r = -20;
 			} else if (id == 2) {
 				if (parse_authorize_result(sctx, val))
-					r = -20;
+					r = -21;
 			} else
 				ASSERT(0);
 		} else {
 			pr_err("JSON-RPC error: unknown message");
-			r = -21;
+			r = -22;
 		}
 
 		json_decref(val);
@@ -713,3 +759,158 @@ int stratum_parse( stratum_ctx *sctx, char *buf, unsigned int len )
 
 	return r ? r : len;
 }
+
+int stratum_parse_server(stratum_ctx *sctx, char *buf, unsigned int len)
+{
+	char *c;
+	json_t *val = NULL, *meth_val, *id_val;
+	json_error_t err;
+	const char *method;
+	unsigned int size;
+	unsigned long long id;
+	int r = 0;
+
+	for (; !r && len > 0 && (c = strchr(buf, '\n')); len -= size, buf = c) {
+		size = (unsigned int)(c - buf + 1);
+		if (size > len)
+			break;
+
+		*c++ = '\0';
+		if (unlikely(!sctx->cx))
+			pr_debug("stratum_parse: %s", buf);
+		else if (sctx->isServer) {
+			pool_ctx *px = sctx->cx;
+			pr_debug("<%s/%s:%hu: %s", px->conf->host, px->addr,
+				px->conf->port, buf);
+		}
+		else {
+			miner_ctx *mx = sctx->cx;
+			pr_debug("<%s/%s@%s:%hu: %s", mx->miner, mx->agent,
+				mx->addr, mx->port, buf);
+		}
+
+		val = json_loads(buf, 0, &err);
+		if (unlikely(!val)) {
+			pr_err("JSON decode failed(%d): %s", err.line, err.text);
+			r = -1;
+			break;
+		}
+
+		meth_val = json_object_get(val, "method");
+		if (meth_val) {
+			method = json_string_value(meth_val);
+			if (unlikely(!method)) {
+				pr_err("JSON-RPC error: null method");
+				r = -2;
+			}
+			else if (sctx->isServer) {
+				if (!strcmp(method, "mining.notify")) {
+					if (parse_job(sctx, json_object_get(val, "params")))
+						r = -3;
+					else if (sctx->jobUpdated && sctx->jobstr)
+						copy_message(sctx->jobstr, sctx->jobLen, buf, size);
+				}
+				else if (!strcmp(method, "mining.set_difficulty")) {
+					if (get_diff(sctx, json_object_get(val, "params")))
+						r = -4;
+					else if (sctx->diffUpdated && sctx->diffstr)
+						copy_message(sctx->diffstr, sctx->diffLen, buf, size);
+				}
+				else if (!strcmp(method, "client.reconnect")) {
+					do_reconnect(sctx, json_object_get(val, "params"));
+					r = -5;
+				}
+				else if (!strcmp(method, "mining.set_extranonce")) {
+					size_t len = sizeof(set_extranonce);
+					if (size >= len) {
+						r = -6;
+					}
+					else {
+						set_extranonce[0] = '\0';
+						copy_message(set_extranonce, sctx->diffLen, buf, size);
+					}
+				}
+				else if (!strcmp(method, "client.show_message")) {
+					if (show_message(sctx, json_object_get(val, "params")))
+						r = -7;
+				}
+				else if (!strcmp(method, "client.get_version")) {
+					/* no get_version support in this edition.  And we always
+					send UA during initialization so a normal pool should
+					not ask for it again. */
+				}
+				else {
+					pr_err("JSON-RPC pool error: unknown method '%s'", method);
+					r = -9;
+				}
+			}
+			else {
+				id_val = json_object_get(val, "id");
+				if (!id_val || json_is_null(id_val) ||
+					!(sctx->msgid = (unsigned int)json_integer_value(id_val))) {
+					pr_err("JSON-RPC miner error: null id");
+					r = -10;
+				}
+				else if (!strcmp(method, "mining.submit")) {
+					miner_ctx *mx = sctx->cx;
+					if (parse_share(sctx, json_object_get(val, "params")))
+						r = -11;
+				}
+				else if (!strcmp(method, "mining.get_transactions")) {
+					if (send_txnlist(sctx, json_object_get(val, "params")))
+						r = -12;
+				}
+				else if (!strcmp(method, "mining.subscribe")) {
+					if (parse_subscribe(sctx, json_object_get(val, "params")))
+						r = -13;
+				}
+				else if (!strcmp(method, "mining.authorize")) {
+					if (parse_authorize(sctx, json_object_get(val, "params")))
+						r = -14;
+				}
+				else if (!strcmp(method, "mining.extranonce.subscribe")) {
+					if (parse_extranonce(sctx, json_object_get(val, "params")))
+						r = -15;
+				}
+				else {
+					pr_err("JSON-RPC miner error: unknown method '%s'", method);
+					r = -16;
+				}
+			}
+		}
+		else if (sctx->isServer) {
+			id_val = json_object_get(val, "id");
+			if (!id_val || json_is_null(id_val)) {
+				pr_err("JSON-RPC response error: null id");
+				r = -17;
+			}
+			else if ((id = json_integer_value(id_val)) >= sctx->msgid) {
+				pr_err("JSON-RPC response error: wrong id");
+				r = -18;
+			}
+			else if (id > 2) {
+				if (parse_submit_response(sctx, val, id))
+					r = -19;
+			}
+			else if (id == 1) {
+				if (setup_context(sctx, val))
+					r = -20;
+			}
+			else if (id == 2) {
+				if (parse_authorize_result(sctx, val))
+					r = -21;
+			}
+			else
+				ASSERT(0);
+		}
+		else {
+			pr_err("JSON-RPC error: unknown message");
+			r = -22;
+		}
+
+		json_decref(val);
+	}
+
+	return r ? r : len;
+}
+

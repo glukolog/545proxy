@@ -53,6 +53,7 @@ typedef enum {
 
 int stratum_init( stratum_ctx *sctx, char *buf, const char* user, const char* passwd );
 int stratum_parse( stratum_ctx *sctx, char *buf, unsigned int len );
+int stratum_parse_server(stratum_ctx *sctx, char *buf, unsigned int len);
 int stratum_create_share( stratum_ctx *sctx, char *share, const char *miner,
 	const char *jobid, const char *xn2, const char *ntime, const char* nonce );
 int stratum_build_reconnect( stratum_ctx *sctx, char *reconn );

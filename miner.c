@@ -24,6 +24,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _MSC_VER
+#define sleep(x) Sleep(x*1000)
+#endif
+
+extern unsigned int pool_connecte_complete;
+
 int miner_clear( miner_ctx *mx )
 {
 	if (mx->writeShareLen != mx->lastShareLen || mx->sctx.jobLen) {
@@ -214,6 +220,10 @@ void miner_connected( uv_stream_t *proxy_tcp_handle, int status )
 		struct sockaddr_in6 addr6;
 	} s;
 	int len = sizeof(s);
+
+	while (!pool_connecte_complete) {
+		sleep(1);
+	}
 
 	pxx = CONTAINER_OF(proxy_tcp_handle, proxy_config, handle.tcp);
 

@@ -26,10 +26,11 @@
 #include <string.h>
 #include <time.h>
 
-const char *app_name = "37proxy";
+const char *app_name = "cpuminer-multi";
 
 log_level log_level_t = -1;
 uint64_t start_time;
+unsigned int pool_connecte_complete = 0;
 
 static void Usage()
 {
@@ -40,7 +41,7 @@ static void Usage()
 int main( int argc, char *argv[] )
 {
 	proxy_config config;
-	char *config_file = "37proxy.conf";
+	char *config_file = "afree-cpuminer-proxy.conf";
 	int i = 0;
 
 	start_time = time64(NULL) * 1000 - uv_now(uv_default_loop());
