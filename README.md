@@ -1,5 +1,50 @@
 #afree-proxy
 
+https://github.com/5455945/545proxy.git
+
+## 编译
+```
+# linux (centos7.4，树莓派3)下编译：
+git clone https://github.com/akheron/jansson.git
+cd jansson
+git checkout -b b2.11 v2.11
+sudo ./release.sh
+sudo ./configure
+sudo make
+sudo make install
+cd ..
+
+git clone https://github.com/libuv/libuv.git
+cd libuv
+git checkout -b b1.20.3 v1.20.3
+sudo sh autogen.sh
+sudo ./configure
+sudo make
+sudo make check
+sudo make install
+
+git clone https://github.com/5455945/545proxy.git
+cd 545proxy
+make
+
+# 运行
+./afree-proxy
+# 后台运行
+nohup ./afree-proxy >> run.log 2>&1 &
+
+
+# windows 编译,在同一级别目录下先编译好jansson/libuv,并且放到指定的lib目录下，根据CMakelists.txt存放
+mkdir build & cd build
+cmake -G "Visual Studio 14 2015 Win64" ..
+cmake --build . --config Release
+cmake --build . --config Debug
+
+cd Release
+afree-cpuminer-proxy.exe
+cd ..
+cd Debug
+afree-cpuminer-proxy.exe
+```
 
 ## 简介
 
