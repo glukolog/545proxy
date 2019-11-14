@@ -50,7 +50,7 @@ int stratum_init( stratum_ctx *sctx, char *buf, const char* user,
 	sprintf(set_extranonce, "{\"id\":3,\"result\":false,\"error\":[20,\"Not supported.\",null]}\n");
 
 	sctx->isServer = 1;
-	sctx->msgid = 3;
+	sctx->msgid = 4;
 	sctx->authorized = 0;
 
 	return sprintf(buf,
@@ -95,15 +95,14 @@ static const char *get_session_id( json_t *val, char *sid, size_t size )
 	int i, n;
 	const char *s;
 
-	arr_val = json_array_get(val, 0);
+	arr_val = val;//json_array_get(val, 0);
 	if (!arr_val || !json_is_array(arr_val))
 		return NULL;
 
 	n = (int)json_array_size(arr_val);
 	for (i = 0; i < n; ++i) {
 		json_t *arr = json_array_get(arr_val, i);
-		if (!arr || !json_is_array(arr))
-			break;
+		if (!arr || !json_is_array(arr)) break;
 
 		s = json_string_value(json_array_get(arr, 0));
 		if (!s)
@@ -300,27 +299,27 @@ incomplete_cb:
 				found_target = 1;
 				target += amount;
 			}
-			pr_info("Coinbase output: %10llu -- %34s%c", amount, addr,
+			pr_info("Coinbase output: %10lu -- %34s%c", amount, addr,
 				i ? '\0' : '*');
 		} else {
 			char *hex = addr;
 			if (script_len * 2 >= sizeof(addr))
 				hex = alloca(script_len * 2 + 1);
 			bin2hex(hex, coinbase + pos, (size_t)script_len, 0);
-			pr_info("Coinbase output: %10llu PK %34s", amount, hex);
+			pr_info("Coinbase output: %10lu PK %34s", amount, hex);
 		}
 
 		pos += (unsigned int)script_len;
 	}
 	if (likely(conf) && total < conf->cbtotal) {
-		pr_err("Coinbase check: lopsided total output amount = %llu, "
-			"expecting >=%llu", total, conf->cbtotal);
+		pr_err("Coinbase check: lopsided total output amount = %lu, "
+			"expecting >=%lu", total, conf->cbtotal);
 		return -8;
 	}
 	if (likely(conf) && conf->cbaddr[0]) {
 		if (conf->cbperc && 
 			!(total && (float)((double)target / total) >= conf->cbperc)) {
-			pr_err("Coinbase check: lopsided target/total = %g(%llu/%llu), "
+			pr_err("Coinbase check: lopsided target/total = %g(%lu/%lu), "
 				"expecting >=%g", (total ? (double)target / total : 0),
 				target, total, conf->cbperc);
 			return -9;
@@ -339,7 +338,7 @@ incomplete_cb:
 		return -12;
 	}
 
-	pr_debug("Coinbase: (size, target, total) = (%u, %llu, %llu)", cbsize,
+	pr_debug("Coinbase: (size, target, total) = (%u, %lu, %lu)", cbsize,
 		target, total);
 
 	return 0;
@@ -664,6 +663,7 @@ int stratum_parse( stratum_ctx *sctx, char *buf, unsigned int len )
 			break;
 		}
 
+//		printf("got : %s\n", json_dumps(val, 0));
 		meth_val = json_object_get(val, "method");
 		if (meth_val) {
 			method = json_string_value(meth_val);
@@ -710,7 +710,7 @@ int stratum_parse( stratum_ctx *sctx, char *buf, unsigned int len )
 					pr_err("JSON-RPC miner error: null id");
 					r = -10;
 				} else if (!strcmp(method, "mining.submit")) {
-					miner_ctx *mx = sctx->cx;
+					//miner_ctx *mx = sctx->cx;
 					if (parse_share(sctx, json_object_get(val, "params")))
 						r = -11;
 				} else if (!strcmp(method, "mining.get_transactions")) {
@@ -852,7 +852,7 @@ int stratum_parse_server(stratum_ctx *sctx, char *buf, unsigned int len)
 					r = -10;
 				}
 				else if (!strcmp(method, "mining.submit")) {
-					miner_ctx *mx = sctx->cx;
+					//miner_ctx *mx = sctx->cx;
 					if (parse_share(sctx, json_object_get(val, "params")))
 						r = -11;
 				}
@@ -885,7 +885,7 @@ int stratum_parse_server(stratum_ctx *sctx, char *buf, unsigned int len)
 				r = -17;
 			}
 			else if ((id = json_integer_value(id_val)) >= sctx->msgid) {
-				pr_err("JSON-RPC response error: wrong id");
+				pr_err("JSON-RPC response error: wrong id = %lld vs %d", id, sctx->msgid);
 				r = -18;
 			}
 			else if (id > 2) {

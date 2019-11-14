@@ -207,7 +207,7 @@ int proxy_run( proxy_config *conf )
 		return err;
 	}
 	if ((err = uv_listen(&conf->handle.stream, 128, miner_connected))) {
-		pr_err("uv_tcp_bind(%s:%hu): %s", conf->host, conf->port,
+		pr_err("uv_listen(%s:%hu): %s", conf->host, conf->port,
 			uv_strerror(err));
 		return err;
 	}
