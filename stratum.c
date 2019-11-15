@@ -95,14 +95,14 @@ static const char *get_session_id( json_t *val, char *sid, size_t size )
 	int i, n;
 	const char *s;
 
-	arr_val = val;//json_array_get(val, 0);
-	if (!arr_val || !json_is_array(arr_val))
+	if (!val || !json_is_array(val))
 		return NULL;
 
-	n = (int)json_array_size(arr_val);
+	n = (int)json_array_size(val);
 	for (i = 0; i < n; ++i) {
-		json_t *arr = json_array_get(arr_val, i);
-		if (!arr || !json_is_array(arr)) break;
+		json_t *arr = json_array_get(val, i);
+		if (arr && json_is_array(arr)) s = get_session_id(arr, sid, size);
+		if (s) return sid;
 
 		s = json_string_value(json_array_get(arr, 0));
 		if (!s)
