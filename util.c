@@ -58,7 +58,7 @@ static void pr_do( FILE *stream, const char *label, const char *fmt,
 	localtime_r((time_t *)&now, &t);
 #endif
 
-	fprintf(stream, "%02d/%02d %02d:%02d:%02d.%03hu %-5s %s%c",
+	fprintf(stream, "%02d/%02d %02d:%02d:%02d.%03hu %-5s %s%c"CL_SIL,
 		t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec, ms,
 		label, fmtbuf, fmtbuf[i - 1] == '\n' ? '\0' : '\n');
 }
@@ -70,7 +70,7 @@ void pr_debug( const char *fmt, ... )
 
 	va_list va;
 	va_start(va, fmt);
-	pr_do(stdout, "DEBUG", fmt, va);
+	pr_do(stdout, CL_GRY"DEBUG"CL_SIL, fmt, va);
 	va_end(va);
 }
 
@@ -81,7 +81,7 @@ void pr_info( const char *fmt, ... )
 
 	va_list va;
 	va_start(va, fmt);
-	pr_do(stdout, "INFO", fmt, va);
+	pr_do(stdout, CL_LBL"INFO"CL_SIL, fmt, va);
 	va_end(va);
 }
 
@@ -92,7 +92,7 @@ void pr_warn( const char *fmt, ... )
 
 	va_list va;
 	va_start(va, fmt);
-	pr_do(stderr, "WARN", fmt, va);
+	pr_do(stderr, CL_YL2"WARN"CL_SIL, fmt, va);
 	va_end(va);
 }
 
@@ -100,7 +100,7 @@ void pr_err( const char *fmt, ... )
 {
 	va_list va;
 	va_start(va, fmt);
-	pr_do(stderr, "ERROR", fmt, va);
+	pr_do(stderr, CL_LRD"ERROR"CL_SIL, fmt, va);
 	va_end(va);
 }
 

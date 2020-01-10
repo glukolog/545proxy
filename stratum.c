@@ -137,7 +137,7 @@ static json_t *get_result( json_t *val )
 	json_t *res_val = json_object_get(val, "error");
 	if (res_val && !json_is_null(res_val)) {
 		char *err = json_dumps(res_val, 0);
-		pr_warn("JSON-RPC result error: %s", err);
+		pr_warn("JSON-RPC result error: "CL_LRD"%s"CL_SIL, err);
 		free(err);
 		return NULL;
 	}
@@ -210,7 +210,7 @@ static int parse_submit_response( stratum_ctx *sctx, json_t *val,
 	if (!(get_result(val))) {
 		pool_ctx *px = sctx->cx;
 		if (px) {
-			pr_warn("Pool %s/%s:%hu refuse share submission %llu",
+			pr_info(CL_LRD"Boooo!!! "CL_SIL"Pool %s/%s:%hu refuse share submission %llu",
 				px->conf->host, px->addr, px->conf->port, id);
 
 			sctx->sdiff -= sctx->diff;
@@ -218,7 +218,7 @@ static int parse_submit_response( stratum_ctx *sctx, json_t *val,
 		}
 	}
 	else {
-		pr_info("*** parse_submit_response: success! ");
+		pr_info(CL_WHT"(%u/%u) "CL_LGR"Accepted!"CL_SIL" share diff:%f, pool diff: %f", sctx->shareCount, sctx->denyCount + sctx->shareCount, sctx->sdiff, sctx->diff );
 	}
 
 	return 0;
@@ -521,16 +521,17 @@ static int parse_share( stratum_ctx *sctx, json_t *val )
 
 	sctx->sdiff += sctx->diff;
 	++sctx->shareCount;
-	pr_info("##008 %s_%s_%d: sctx->shareCount:%u, sctx->sdiff:%f, sctx->diff:%f", 
+	pr_debug("##008 %s_%s_%d: sctx->shareCount:%u, sctx->sdiff:%f, sctx->diff:%f", 
 		__FILE__, __FUNCTION__, __LINE__, sctx->shareCount, sctx->sdiff, sctx->diff);
 
 	if ((mx = sctx->cx))
 		mx->px->ss(mx, miner, jobid, xn, ntime, nonce);
 
 	if (mx) {
-		pr_info("##009 %s_%s_%d: sctx->shareCount:%u, sctx->sdiff:%f, sctx->diff:%f, mx->m_req:%X, mx->handle.stream:%X",
+		pr_debug("##009 %s_%s_%d: sctx->shareCount:%u, sctx->sdiff:%f, sctx->diff:%f, mx->m_req:%X, mx->handle.stream:%X",
 			__FILE__, __FUNCTION__, __LINE__, sctx->shareCount, sctx->sdiff, sctx->diff, mx->m_req, mx->handle.stream);
-		pr_info("##010 %s_%s_%d: mx->bind:%s, mx->addr:%s, mx->port:%u", __FILE__, __FUNCTION__, __LINE__, mx->bind, mx->addr, mx->port);
+		pr_debug("##010 %s_%s_%d: mx->bind:%s, mx->addr:%s, mx->port:%u", __FILE__, __FUNCTION__, __LINE__, mx->bind, mx->addr, mx->port);
+		pr_info("["CL_LBL"%s"CL_SIL"] share diff: %f", mx->addr, sctx->sdiff);
 	}
 
 	sctx->jobLen += sprintf(mx->outbuf + sctx->jobLen,

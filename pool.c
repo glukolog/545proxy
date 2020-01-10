@@ -243,6 +243,10 @@ void pool_connected( uv_connect_t *req, int status )
 	pr_info("Pool %s/%s:%hu connected", px->conf->host, px->addr,
 		px->conf->port);
 
+	pr_info("    Priority/Weight: "CL_LBL"%d / %u"CL_SIL, px->conf->priority, px->conf->weight);
+	pr_info("    User/Password: "CL_LBL"%s / %s"CL_SIL, px->conf->miner, px->conf->passwd);
+	pr_info("    Timeout: "CL_LBL"%u"CL_SIL, px->conf->timeout);
+
 	buf.base = px->buf;
 	buf.len = stratum_init(&px->sctx, px->buf, px->conf->miner,
 		px->conf->passwd);
@@ -361,7 +365,7 @@ void pool_submit_share( miner_ctx *mx, const char *miner, const char* jobid,
 		buf.base = mx->share + mx->lastShareLen;
 		buf.len = mx->shareLen - mx->lastShareLen;
 		mx->lastShareLen = mx->shareLen;
-		pr_info("##007 %s_%s_%d: mx:%X, mx->m_req:%X, mx->handle.stream:%X, buf.len:%u, buf.base:%s", 
+		pr_debug("##007 %s_%s_%d: mx:%X, mx->m_req:%X, mx->handle.stream:%X, buf.len:%u, buf.base:%s", 
 			__FILE__, __FUNCTION__, __LINE__, mx, mx->m_req, mx->handle.stream, buf.len, buf.base);
 		uv_write(&mx->p_req, &px->handle.stream, &buf, 1,
 			share_submitted);
